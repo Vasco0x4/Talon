@@ -114,6 +114,74 @@ class CommandExit( Command ):
 
         return Task.buffer
 
+def _parse_register( parser ):
+    # Register info:
+    #   - AgentID           : int [needed]
+    #   - Hostname          : str [needed]
+    #   - Username          : str [needed]
+    #   - Domain            : str [optional]
+    #   - InternalIP        : str [needed]
+    #   - Process Path      : str [needed]
+    #   - Process Name      : str [needed]
+    #   - Process ID        : int [needed]
+    #   - Process Parent ID : int [optional]
+    #   - Process Arch      : str [needed]
+    #   - Process Elevated  : int [needed]
+    #   - OS Build          : str [needed]
+    #   - OS Version        : str [needed]
+    #   - OS Arch           : str [optional]
+    #   - Sleep             : int [optional]
+
+    RegisterInfo = {
+        "AgentID"           : parser.parse_int(),
+        "Hostname"          : parser.parse_str(),
+        "Username"          : parser.parse_str(),
+        "Domain"            : parser.parse_str(),
+        "InternalIP"        : parser.parse_str(),
+        "Process Path"      : parser.parse_str(),
+        "Process ID"        : str(parser.parse_int()),
+        "Process Parent ID" : str(parser.parse_int()),
+        "Process Arch"      : parser.parse_int(),
+        "Process Elevated"  : parser.parse_int(),
+        "OS Build"          : str(parser.parse_int()) + "." + str(parser.parse_int()) + "." + str(parser.parse_int()) + "." + str(parser.parse_int()) + "." + str(parser.parse_int()), # (MajorVersion).(MinorVersion).(ProductType).(ServicePackMajor).(BuildNumber)
+        "OS Arch"           : parser.parse_int(),
+        "SleepDelay"        : parser.parse_int(),
+    }
+
+    RegisterInfo[ "Process Name" ] = RegisterInfo[ "Process Path" ].split( "\\" )[-1]
+
+    # this OS info is going to be displayed on the GUI Session table.
+    RegisterInfo[ "OS Version" ] = RegisterInfo[ "OS Build" ] # "Windows Some version"
+
+    if RegisterInfo[ "OS Arch" ] == 0:
+        RegisterInfo[ "OS Arch" ] = "x86"
+    elif RegisterInfo[ "OS Arch" ] == 9:
+        RegisterInfo[ "OS Arch" ] = "x64/AMD64"
+    elif RegisterInfo[ "OS Arch" ] == 5:
+        RegisterInfo[ "OS Arch" ] = "ARM"
+    elif RegisterInfo[ "OS Arch" ] == 12:
+        RegisterInfo[ "OS Arch" ] = "ARM64"
+    elif RegisterInfo[ "OS Arch" ] == 6:
+        RegisterInfo[ "OS Arch" ] = "Itanium-based"
+    else:
+        RegisterInfo[ "OS Arch" ] = "Unknown (" + str(RegisterInfo[ "OS Arch" ]) + ")"
+
+    # Process Arch
+    if RegisterInfo[ "Process Arch" ] == 0:
+        RegisterInfo[ "Process Arch" ] = "Unknown"
+
+    elif RegisterInfo[ "Process Arch" ] == 1:
+        RegisterInfo[ "Process Arch" ] = "x86"
+
+    elif RegisterInfo[ "Process Arch" ] == 2:
+        RegisterInfo[ "Process Arch" ] = "x64"
+
+    elif RegisterInfo[ "Process Arch" ] == 3:
+        RegisterInfo[ "Process Arch" ] = "IA64"
+
+    return RegisterInfo
+
+
 # =======================
 # ===== Agent Class =====
 # =======================
@@ -180,69 +248,7 @@ class Talon(AgentType):
             if Command == COMMAND_REGISTER:
                 print( "[*] Is agent register request" )
 
-                # Register info:
-                #   - AgentID           : int [needed]
-                #   - Hostname          : str [needed]
-                #   - Username          : str [needed]
-                #   - Domain            : str [optional]
-                #   - InternalIP        : str [needed]
-                #   - Process Path      : str [needed]
-                #   - Process Name      : str [needed]
-                #   - Process ID        : int [needed]
-                #   - Process Parent ID : int [optional]
-                #   - Process Arch      : str [needed]
-                #   - Process Elevated  : int [needed]
-                #   - OS Build          : str [needed]
-                #   - OS Version        : str [needed]
-                #   - OS Arch           : str [optional]
-                #   - Sleep             : int [optional]
-
-                RegisterInfo = {
-                    "AgentID"           : response_parser.parse_int(),
-                    "Hostname"          : response_parser.parse_str(),
-                    "Username"          : response_parser.parse_str(),
-                    "Domain"            : response_parser.parse_str(),
-                    "InternalIP"        : response_parser.parse_str(),
-                    "Process Path"      : response_parser.parse_str(),
-                    "Process ID"        : str(response_parser.parse_int()),
-                    "Process Parent ID" : str(response_parser.parse_int()),
-                    "Process Arch"      : response_parser.parse_int(),
-                    "Process Elevated"  : response_parser.parse_int(),
-                    "OS Build"          : str(response_parser.parse_int()) + "." + str(response_parser.parse_int()) + "." + str(response_parser.parse_int()) + "." + str(response_parser.parse_int()) + "." + str(response_parser.parse_int()), # (MajorVersion).(MinorVersion).(ProductType).(ServicePackMajor).(BuildNumber)
-                    "OS Arch"           : response_parser.parse_int(),
-                    "SleepDelay"             : response_parser.parse_int(),
-                }
-
-                RegisterInfo[ "Process Name" ] = RegisterInfo[ "Process Path" ].split( "\\" )[-1]
-
-                # this OS info is going to be displayed on the GUI Session table.
-                RegisterInfo[ "OS Version" ] = RegisterInfo[ "OS Build" ] # "Windows Some version"
-
-                if RegisterInfo[ "OS Arch" ] == 0:
-                    RegisterInfo[ "OS Arch" ] = "x86"
-                elif RegisterInfo[ "OS Arch" ] == 9:
-                    RegisterInfo[ "OS Arch" ] = "x64/AMD64"
-                elif RegisterInfo[ "OS Arch" ] == 5:
-                    RegisterInfo[ "OS Arch" ] = "ARM"
-                elif RegisterInfo[ "OS Arch" ] == 12:
-                    RegisterInfo[ "OS Arch" ] = "ARM64"
-                elif RegisterInfo[ "OS Arch" ] == 6:
-                    RegisterInfo[ "OS Arch" ] = "Itanium-based"
-                else:
-                    RegisterInfo[ "OS Arch" ] = "Unknown (" + RegisterInfo[ "OS Arch" ] + ")"
-
-                # Process Arch
-                if RegisterInfo[ "Process Arch" ] == 0:
-                    RegisterInfo[ "Process Arch" ] = "Unknown"
-
-                elif RegisterInfo[ "Process Arch" ] == 1:
-                    RegisterInfo[ "Process Arch" ] = "x86"
-
-                elif RegisterInfo[ "Process Arch" ] == 2:
-                    RegisterInfo[ "Process Arch" ] = "x64"
-
-                elif RegisterInfo[ "Process Arch" ] == 3:
-                    RegisterInfo[ "Process Arch" ] = "IA64"
+                RegisterInfo = _parse_register( response_parser )
 
                 self.register( agent_header, RegisterInfo )
 
@@ -254,6 +260,22 @@ class Talon(AgentType):
             print( f"[*] Something else: {Command}" )
 
             AgentID = response[ "Agent" ][ "NameID" ]
+
+            if Command == COMMAND_REGISTER:
+                # Re-register from an agent the teamserver already knows (e.g.
+                # after a transient transport failure or teamserver restart).
+                # Re-run the full registration instead of just echoing: agents
+                # restored from the DB carry Demon's magic value (upstream
+                # quirk — MagicValue is not persisted), which makes task
+                # dispatch skip them; re-registering replaces the instance
+                # with a correctly-typed one.
+                print( "[*] Is agent re-register request" )
+
+                RegisterInfo = _parse_register( response_parser )
+
+                self.register( agent_header, RegisterInfo )
+
+                return RegisterInfo[ 'AgentID' ].to_bytes( 4, 'little' )
 
             if Command == COMMAND_GET_JOB:
                 print( "[*] Get list of jobs and return it." )

