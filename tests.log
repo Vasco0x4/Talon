@@ -43,7 +43,26 @@
   API returns top-level {"status":N}, not data.status — so it timed out at 60 min;
   result fetched directly with no extra cost.)
 
+[2026-09-28 16:1x UTC] STATIC — LOT A2 (commit f5a13b8)
+  cost: $0.10
+  payload: Agent/Bin/Talon.exe sha256=6b6d81c1ea8d4b331bb6ccbe182e6b2a29489c590fc6c20f3ebc3794ba2679ce
+  changes: Lot A2 — NtDelayExecution indirect syscall (SysExtract SSN + tail-jmp to ntdll syscall instr, hooked-stub fallback), AceLdr return-address spoofing on all WinHttp calls (kernel32 jmp-[rbx] gadget), L"POST" verb XOR-encoded. 10.7 KB; imports unchanged (zero msvcrt); no UTF-16 strings.
+  engines: crowdstrike, microsoftdefender
+  token: 6f7f541b6aa2d5e1a06ab5d69c2939b5781e78d40d27d6d1a9f9a2ac8fffa99f
+  results: crowdstrike=Undetected | microsoftdefender=Undetected
+
+[2026-09-28 16:1x UTC] RUNTIME — LOT A2 (commit f5a13b8)
+  cost: $1.00
+  payload: Agent/Bin/Talon.exe sha256=6b6d81c1ea8d4b331bb6ccbe182e6b2a29489c590fc6c20f3ebc3794ba2679ce
+  changes: same as static entry above (post-static-pre-filter submission)
+  engines: crowdstrike, microsoftdefender, microsoftdefender11
+  connect_internet: false
+  token: 89b60ea3b89af2283d338c5275c8917c250ddb7ae5f27aacb59be954259638de
+  results: crowdstrike=undetected | microsoftdefender=undetected | microsoftdefender11=undetected
+  notes: status hit 3 within the first poll; a momentary per-engine "scanning" state
+  resolved to final results on re-fetch (no extra cost).
+
 ================ TOTALS ================
-static:  $0.50 (baseline $0.20 + Lot A1 $0.30 incl. conservative orphans)
-runtime: $2.00 (baseline + Lot A1, both 3/3 undetected)
-spent:   ~$2.50 / $6.00
+static:  $0.60 (baseline $0.20 + Lot A1 $0.30 + Lot A2 $0.10)
+runtime: $3.00 (baseline + Lot A1 + Lot A2, all 3/3 undetected)
+spent:   ~$3.60 / $6.00

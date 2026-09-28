@@ -34,4 +34,11 @@ PVOID MmGadgetFind( PVOID Memory, SIZE_T Length, PVOID PatternBuffer, SIZE_T Pat
 #define SPOOF_F( fn, a, b, c, d, e, f ) SpoofRetAddr( fn, a, b, c, d, e, f, NULL, NULL )
 #define SPOOF_G( fn, a, b, c, d, e, f, g ) SpoofRetAddr( fn, a, b, c, d, e, f, g, NULL )
 
+/* Call an API through the trampoline when a gadget is available, else
+ * directly — either way the same import is used. */
+#define SPOOF_NARG( _1,_2,_3,_4,_5,_6,_7,_8,N,... ) N
+#define SPOOF_PICK( ... ) SPOOF_NARG( __VA_ARGS__, SPOOF_G, SPOOF_F, SPOOF_E, SPOOF_D, SPOOF_C, SPOOF_B, SPOOF_A, SPOOF_X )
+#define SPOOF_CALL( fn, ... ) \
+    ( SpoofReady() ? ( HANDLE ) SPOOF_PICK( fn, __VA_ARGS__ )( fn, __VA_ARGS__ ) : ( HANDLE ) ( fn( __VA_ARGS__ ) ) )
+
 #endif
