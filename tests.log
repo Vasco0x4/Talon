@@ -62,7 +62,34 @@
   notes: status hit 3 within the first poll; a momentary per-engine "scanning" state
   resolved to final results on re-fetch (no extra cost).
 
+[2026-09-28 17:4x UTC] STATIC — LOT B (commit 5e73ab1)
+  cost: $0.10
+  payload: Agent/Bin/Talon.exe sha256=626a6cb9231b43e8ee387580168941d1a7e06c8473b13f1a0cd5451e2262c592
+  changes: Lot B — ETW interception via Dr0 hardware breakpoint on ntdll!NtTraceEvent + first-in-line VEH (no byte patching); new kernel32 imports GetCurrentThread/GetThreadContext/SetThreadContext; context calls through spoofing trampoline. 12.3 KB.
+  engines: crowdstrike, microsoftdefender
+  token: f60340d625373e65d03d2eb9fbe467b27e0df38704078910c18a469f2eaeae32
+  results: crowdstrike=Undetected | microsoftdefender=Undetected
+  notes: no separate runtime scan spent on this SHA — the lab-config build below (D10)
+  contains identical code and is the actual final artifact, so it was scanned instead.
+
+[2026-09-28 18:0x UTC] STATIC — LAB BUILD (Lot B code + lab C2 config, commit pending)
+  cost: $0.10
+  payload: Agent/Bin/Talon.exe sha256=9f285115b6c1cbdf3066b8edaea133119f7964c24afa2049fd060a45f1ad4505
+  changes: identical code to Lot B; config only — host=10.50.100.122 (lab teamserver container), port=9001, CONFIG_SECURE=TRUE (TLS listener "talon-lab"), endpoint=/service-endpoint. New XOR keys for all transport strings.
+  engines: crowdstrike, microsoftdefender
+  token: ab8bf5a067de1fa904a2fd0c2b3b25494ea7c7c6ac510a35d17e2a028cc34a54
+  results: crowdstrike=Undetected | microsoftdefender=Undetected
+
+[2026-09-28 18:1x UTC] RUNTIME — LAB BUILD (final candidate)
+  cost: $1.00
+  payload: Agent/Bin/Talon.exe sha256=9f285115b6c1cbdf3066b8edaea133119f7964c24afa2049fd060a45f1ad4505
+  changes: same as static entry above (post-static-pre-filter submission)
+  engines: crowdstrike, microsoftdefender, microsoftdefender11
+  connect_internet: false
+  token: 8ec36d437a87da173242cdd4d4cfaf090a5de1f19a0d2855dd6d267cf5b7b68d
+  results: PENDING
+
 ================ TOTALS ================
-static:  $0.60 (baseline $0.20 + Lot A1 $0.30 + Lot A2 $0.10)
-runtime: $3.00 (baseline + Lot A1 + Lot A2, all 3/3 undetected)
-spent:   ~$3.60 / $6.00
+static:  $0.80 (baseline $0.20 + Lot A1 $0.30 + Lot A2 $0.10 + Lot B $0.10 + lab build $0.10)
+runtime: $4.00 (baseline + Lot A1 + Lot A2 = 3/3 undetected; lab build PENDING)
+spent:   ~$4.80 / $6.00 (at soft-stop line; $1.20 reserve for post-VM-fix rescan if needed)

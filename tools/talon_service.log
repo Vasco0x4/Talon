@@ -1,0 +1,7 @@
+/root/talon/Agent/Talon.py:38: SyntaxWarning: invalid escape sequence '\w'
+  Task.add_data( "c:\windows\system32\cmd.exe /c " + arguments[ 'commands' ] )
+[*] Connect to Havoc service api
+[*] teamserver socket opened
+[*] New Message
+[*] Register Talon to Havoc
+[*] register agent

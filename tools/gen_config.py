@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Generate XOR-obfuscated C arrays for Talon Config.h transport strings.
+"""Generate XOR-obfuscated C arrays for Talon transport strings.
 
-Usage: python3 gen_config.py
-Prints C code to paste into Agent/Include/Config.h (regenerate per build lot;
-the key is random each run).
+Usage: python3 gen_config.py [host] [endpoint]
+Prints C code to paste into Agent/Source/Core.c (regenerate per build lot;
+the key is random each run). Defaults are the stock Talon target.
 """
 import secrets
+import sys
 
 
 def encode(text: str) -> tuple[bytes, bytes]:
@@ -26,8 +27,8 @@ def c_array(name: str, data: bytes) -> str:
 
 
 UA = r"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
-HOST = "192.168.0.251"
-ENDPOINT = "index.php"
+HOST = sys.argv[1] if len(sys.argv) > 1 else "192.168.0.251"
+ENDPOINT = sys.argv[2] if len(sys.argv) > 2 else "index.php"
 
 ua_data, ua_key = encode(UA)
 host_data, host_key = encode(HOST)
