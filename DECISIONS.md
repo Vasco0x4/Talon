@@ -30,6 +30,15 @@ Budget forces batching (~4-5 runtime scans total). Planned lots:
 ### D4 — Preserve the magic-value byte-order quirk
 Talon writes ints big-endian (`Int32ToBuffer`) while the teamserver parses little-endian: C constant `'taln'` = `0x6e6c6174` on the wire is read by Go as `0x74616c6e`, which matches `Talon.py`'s `MagicValue = 0x74616c6e`. Do NOT "fix" endianness without changing both sides.
 
+### D5 — Drop msvcrt entirely: `-nostartfiles` + entry `-e WinMain`
+Removing every `printf/puts` did NOT remove the msvcrt import chain (26 functions survived). Root cause: the GCC driver always links `crt2.o`, whose `WinMainCRTStartup` references the `.CRT$X*` init sections, pulling the whole CRT startup import set into the IAT even with `--gc-sections` (the thunks live in retained sections). Fix: link with `-nostartfiles` — no CRT object at all; entry point is our own `WinMain` via `-e WinMain` (verified by disassembly: entry = our do/while beacon loop, no CRT init runs). Result: msvcrt 26 → 1 import.
+
+### D6 — Kill the last msvcrt import (`strlen`): pointer-walk `StrLenA`
+After D5, one orphan `msvcrt!strlen` remained although no source file called `strlen`. Cause: GCC recognises the counting-loop pattern `while ( s[n] ) n++;` as a strlen builtin and emits an import thunk for it **even with `-fno-builtin-strlen`** (GCC 13-win32, `-Os`; the out-of-line copy is left as a jmp+nop stub whose only relocation is to strlen — the linker keeps the import because the section survives). Fix: rewrite `StrLenA` as a pointer walk (`const char *p = s; while (*p) p++; return p - s;`) which compiles to a plain loop with no builtin recognition. Verified on 4 loop variants: index-count and do-while forms are recognised, pointer-walk is not. Final import table: ADVAPI32 (1), IPHLPAPI (1), KERNEL32 (18), WINHTTP (9) — **zero msvcrt**. `-fno-builtin-strlen` kept in CFLAGS as defense-in-depth for future edits.
+
+### D7 — Lot A1 scope (committed before first post-baseline scan)
+Lot A1 = everything that reshapes the static surface without new code paths: debug output → no-op `Dbg()` macro, config strings XOR-encoded (`tools/gen_config.py`, decoded into `LocalAlloc` buffers at init), sleep via `WaitForSingleObjectEx(GetCurrentProcess(), jittered_ms)` resolved dynamically from kernel32 (jitter ±40%), `-nostartfiles`/`-e WinMain` (D5), pointer-walk `StrLenA` (D6). Build: 8.7 KB, sections .text/.data/.rdata/.idata/.reloc only; visible strings = DOS stub + import names + "POST" (UTF-16, WinHttp verb) — no Mozilla UA, no index.php, no IPs. Return-address spoofing and indirect syscalls stay in Lot A2 (new code paths → own scan).
+
 ## Baseline detection surface (unmodified Talon.exe)
 - Imports: KERNEL32 (~25 fns incl. Sleep, CreateProcessA), WINHTTP, ADVAPI32 (GetUserNameA), IPHLPAPI (GetAdaptersInfo), msvcrt (CRT via printf/puts).
 - Visible strings: debug formats (`> WinHttpConnect=> %d`, `WinHttpOpenRequest: Failed => %d`...), CRT messages.

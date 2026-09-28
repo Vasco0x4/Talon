@@ -16,8 +16,8 @@ INT WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
             if ( TransportInit( ) )
                 CommandDispatcher();
         }
-        
-        Sleep( 3 * 1000 );
+
+        TalonSleep();
 
     } while ( TRUE );
 }

