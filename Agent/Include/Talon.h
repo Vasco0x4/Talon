@@ -48,6 +48,14 @@ typedef struct _INSTANCE {
     } Win32;
 
     struct {
+        BOOL Ready; /* NtDelayExecution resolvable via indirect syscall */
+        struct {
+            PVOID Adr; /* ntdll `syscall` instruction to tail-jump */
+            WORD  Ssn; /* service number */
+        } NtDelayExecution;
+    } Syscall;
+
+    struct {
         DWORD Sleeping;
         DWORD Jitter;
         struct {

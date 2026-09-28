@@ -23,7 +23,27 @@
   "Authentication token is invalid" because the Kleenscan key was rotated mid-flight;
   re-fetched successfully with the new token (no extra cost, same scan_token).
 
+[2026-09-28 15:0x UTC] STATIC — LOT A1 (commit c6e077f)
+  cost: $0.10 (+$0.20 possible orphans: two transient empty-response submissions via tools/kleenscan.py before the direct-curl submit succeeded; counted conservatively => static total $0.30)
+  payload: Agent/Bin/Talon.exe sha256=5c1b79d04d977935c890e00dedb0becc0c5b95f6b047c313bdb03e9ce3f22521
+  changes: Lot A1 — no msvcrt (-nostartfiles + pointer-walk StrLenA, DECISIONS D5/D6), XOR-encoded config strings, jittered sleep via WaitForSingleObjectEx (dynamic GetProcAddress), debug output removed, --gc-sections hardening. 8.7 KB; imports = ADVAPI32/IPHLPAPI/KERNEL32/WINHTTP only.
+  engines: crowdstrike, microsoftdefender
+  token: 88e3ca6a32a40313fc2a80351c3ce132987038500a9a8c6bd22da66c3f49b3a3
+  results: crowdstrike=Undetected | microsoftdefender=Undetected
+
+[2026-09-28 15:0x UTC] RUNTIME — LOT A1 (commit c6e077f)
+  cost: $1.00
+  payload: Agent/Bin/Talon.exe sha256=5c1b79d04d977935c890e00dedb0becc0c5b95f6b047c313bdb03e9ce3f22521
+  changes: same as static entry above (post-static-pre-filter submission)
+  engines: crowdstrike, microsoftdefender, microsoftdefender11
+  connect_internet: false
+  token: 6f80b8d1379fa6b050cea71c93b33833186cba0a1f58034d0723fb381a364e16
+  results: crowdstrike=undetected | microsoftdefender=undetected | microsoftdefender11=undetected
+  notes: scan completed ~16:00 UTC. (Background poller mis-parsed the status JSON —
+  API returns top-level {"status":N}, not data.status — so it timed out at 60 min;
+  result fetched directly with no extra cost.)
+
 ================ TOTALS ================
-static:  $0.20 (baseline, incl. conservative orphan)
-runtime: $1.00 (baseline)
-spent:   ~$1.20 / $6.00
+static:  $0.50 (baseline $0.20 + Lot A1 $0.30 incl. conservative orphans)
+runtime: $2.00 (baseline + Lot A1, both 3/3 undetected)
+spent:   ~$2.50 / $6.00

