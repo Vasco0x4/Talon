@@ -1,0 +1,5 @@
+Agent/Bin/*.exe
+.idea/
+*.o
+__pycache__/
+tools/.kleenscan_token
