@@ -3,3 +3,8 @@ Agent/Bin/*.exe
 *.o
 __pycache__/
 tools/.kleenscan_token
+
+# mission notes / debug logs — kept locally, live in the private Hovoc-Demons repo
+/DECISIONS.md
+/tests.log
+/tools/talon_service.log

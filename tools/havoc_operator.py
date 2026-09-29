@@ -6,24 +6,31 @@ ClientAuthenticate and cmd/server/dispatch.go):
   - InitConnection.Type=0x1 / OAuthRequest=0x3, Password = SHA3-256 hex
   - Session.Type=0x7 / Input=0x3 with Info{DemonID, Command, <params>, TaskID, CommandLine}
 
-Usage: python3 havoc_operator.py <agent_nameid> <command...>
+Connection params come from the environment (no lab credentials in this file):
+  HAVOC_HOST (default 127.0.0.1), HAVOC_PORT (default 8888),
+  HAVOC_USER (default admin), HAVOC_PASSWORD (required)
+
+Usage: HAVOC_PASSWORD=... python3 havoc_operator.py <agent_nameid> <command...>
 """
 import hashlib
 import json
+import os
 import ssl
 import sys
 import time
 
 from websocket import create_connection  # websocket-client (in /opt/havoc-py/venv)
 
-HOST = '127.0.0.1'
-PORT = 40056
+HOST = os.environ.get('HAVOC_HOST', '127.0.0.1')
+PORT = int(os.environ.get('HAVOC_PORT', '8888'))
 PATH = '/havoc/'
-USER = 'admin'
-PASSWORD = 'p9kblB6cNJ0ZO0c7KZ'  # from /root/Havoc/data/havoc.yaotl Operators
+USER = os.environ.get('HAVOC_USER', 'admin')
+PASSWORD = os.environ.get('HAVOC_PASSWORD', '')
 
 
 def main():
+    if not PASSWORD:
+        sys.exit('[!] set HAVOC_PASSWORD (teamserver operator password from the yaotl profile)')
     nameid = sys.argv[1]
     cmdline = ' '.join(sys.argv[2:])
 
